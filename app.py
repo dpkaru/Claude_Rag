@@ -2,15 +2,18 @@
 app.py
 ======
 RAG Studio — Frontend (Streamlit UI)
-Imports all logic from backend.py — zero business logic lives here.
+Warm rose-cream aesthetic with activity stream, file cards, and status panels.
+All logic imported from backend.py.
 """
 
+import datetime
 import streamlit as st
 from backend import (
     CHUNK_STRATEGIES,
     SUPPORTED_EMBED_MODELS,
     SUPPORTED_MODELS,
     build_vectorstore,
+    get_groq_api_key,
     get_llm,
     load_file,
     rag_answer,
@@ -21,455 +24,498 @@ from backend import (
 # ──────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="RAG Studio",
-    page_icon="🔬",
+    page_icon="✦",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  GLOBAL CSS — "Research Terminal" aesthetic
-#  Monospace + neon-green on near-black, tight grid, data-dense panels
+#  CSS — Warm Rose / Cream aesthetic
 # ──────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
-/* ── Reset & base ── */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+    --cream:      #fdf6f0;
+    --rose-light: #f9ede8;
+    --rose-mid:   #e8c4bc;
+    --rose-warm:  #c97b6e;
+    --rose-deep:  #a85a50;
+    --terracotta: #b86455;
+    --blush:      #f2d8d2;
+    --text-dark:  #3d2820;
+    --text-mid:   #7a4f47;
+    --text-soft:  #b08880;
+    --border:     #e5cdc8;
+    --card-bg:    #fdf0ec;
+    --white:      #ffffff;
+    --teal:       #4a9ba8;
+    --teal-light: #d4eff3;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body, [class*="css"] {
     font-family: 'DM Sans', sans-serif;
-    background: #080b10;
-    color: #d4dbe8;
+    background: var(--cream);
+    color: var(--text-dark);
 }
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #0e1218; }
-::-webkit-scrollbar-thumb { background: #1e3a2f; border-radius: 2px; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--rose-light); }
+::-webkit-scrollbar-thumb { background: var(--rose-mid); border-radius: 3px; }
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #070a0f 0%, #080d12 100%);
-    border-right: 1px solid #0f2318;
-    width: 290px !important;
+    background: linear-gradient(180deg, #2e1a16 0%, #3d2218 50%, #2a1a12 100%) !important;
+    border-right: none;
 }
-[data-testid="stSidebar"] > div { padding: 0 !important; }
-[data-testid="stSidebar"] * { color: #8fa3b1 !important; }
+[data-testid="stSidebar"] * { color: #d4b8b0 !important; }
 [data-testid="stSidebar"] label {
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.65rem !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.62rem !important;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #3d6b4f !important;
-}
-[data-testid="stSidebar"] .stSelectbox > div > div {
-    background: #0c1419 !important;
-    border: 1px solid #142b1e !important;
-    border-radius: 6px !important;
-    color: #a8c5b5 !important;
-    font-size: 0.82rem !important;
+    letter-spacing: 0.14em;
+    color: #8a5a50 !important;
 }
 [data-testid="stSidebar"] .stTextInput input {
-    background: #0c1419 !important;
-    border: 1px solid #142b1e !important;
-    color: #a8c5b5 !important;
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.78rem !important;
-    border-radius: 6px !important;
+    background: #1e0f0c !important;
+    border: 1px solid #5a2e28 !important;
+    color: #e8c4bc !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.76rem !important;
+    border-radius: 8px !important;
 }
 [data-testid="stSidebar"] .stTextInput input:focus {
-    border-color: #2ef87d !important;
-    box-shadow: 0 0 0 2px rgba(46,248,125,0.08) !important;
+    border-color: #c97b6e !important;
+    box-shadow: 0 0 0 2px rgba(201,123,110,0.2) !important;
 }
-[data-testid="stSidebar"] .stSlider [data-baseweb="slider"] {
-    padding: 0 !important;
+[data-testid="stSidebar"] .stSelectbox > div > div {
+    background: #1e0f0c !important;
+    border: 1px solid #5a2e28 !important;
+    color: #e8c4bc !important;
+    border-radius: 8px !important;
+    font-size: 0.82rem !important;
+}
+[data-testid="stSidebar"] hr {
+    border-color: #5a2e28 !important;
 }
 
-/* ── Main area ── */
+/* ── Main background ── */
 .main .block-container {
-    background: #080b10;
+    background: var(--cream);
     padding: 2rem 2.5rem 4rem 2.5rem;
-    max-width: 1200px;
+    max-width: 1300px;
 }
 
 /* ── Masthead ── */
-.masthead {
+.masthead-wrap {
     display: flex;
-    align-items: flex-end;
-    gap: 0;
-    margin-bottom: 0.15rem;
-    line-height: 1;
-}
-.masthead-rag {
-    font-family: 'Space Mono', monospace;
-    font-size: 2.4rem;
-    font-weight: 700;
-    color: #2ef87d;
-    letter-spacing: -0.03em;
-    text-shadow: 0 0 40px rgba(46,248,125,0.25);
-}
-.masthead-studio {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 2.4rem;
-    font-weight: 300;
-    color: #cdd8e3;
-    letter-spacing: -0.02em;
-    margin-left: 10px;
-}
-.masthead-version {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.6rem;
-    color: #2a4d38;
-    margin-left: 10px;
-    margin-bottom: 8px;
-    letter-spacing: 0.1em;
-}
-.masthead-sub {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.7rem;
-    color: #2e5c42;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    align-items: flex-start;
+    justify-content: space-between;
     margin-bottom: 2rem;
 }
+.masthead-left {}
+.masthead-icon {
+    font-size: 2rem;
+    margin-bottom: 0.2rem;
+    opacity: 0.7;
+}
+.masthead-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.8rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    line-height: 1;
+    margin-bottom: 0.3rem;
+}
+.masthead-title .accent { color: var(--rose-warm); }
+.masthead-sub {
+    font-size: 0.82rem;
+    color: var(--text-soft);
+    letter-spacing: 0.04em;
+}
 
-/* ── Section label ── */
-.section-label {
-    font-family: 'Space Mono', monospace;
+/* ── Section headers ── */
+.section-hdr {
+    font-family: 'DM Mono', monospace;
     font-size: 0.62rem;
-    color: #2a6644;
     text-transform: uppercase;
-    letter-spacing: 0.16em;
-    margin-bottom: 0.6rem;
+    letter-spacing: 0.18em;
+    color: var(--text-soft);
+    margin-bottom: 0.8rem;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
-.section-label::after {
+.section-hdr::after {
     content: '';
     flex: 1;
     height: 1px;
-    background: linear-gradient(90deg, #0f2a1c, transparent);
+    background: var(--border);
 }
 
-/* ── Panel cards ── */
-.panel {
-    background: #0c1118;
-    border: 1px solid #111d27;
-    border-radius: 10px;
-    padding: 1.4rem 1.6rem;
-    margin-bottom: 1.2rem;
-    position: relative;
+/* ── Upload card ── */
+.upload-card {
+    background: var(--white);
+    border: 1.5px dashed var(--rose-mid);
+    border-radius: 14px;
+    padding: 0.5rem 1rem;
+    transition: border-color 0.2s;
 }
-.panel::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #2ef87d22, transparent);
-    border-radius: 10px 10px 0 0;
-}
-
-/* ── Status badges ── */
-.badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
-    border-radius: 4px;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
-.badge-ready   { background: #071a0e; color: #2ef87d; border: 1px solid #1a5c30; }
-.badge-idle    { background: #101520; color: #4a6880; border: 1px solid #1a2b3a; }
-.badge-info    { background: #0b1828; color: #4a90d9; border: 1px solid #1a3a60; }
-.badge-warn    { background: #1a1200; color: #e0a030; border: 1px solid #5a3e00; }
-.badge-dot-green::before { content:'●'; font-size: 0.55rem; color:#2ef87d; animation: pulse 2s infinite; }
-.badge-dot-gray::before  { content:'●'; font-size: 0.55rem; color:#2a4050; }
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-}
-
-/* ── File pills ── */
-.file-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 0.7rem; }
-.file-pill {
-    background: #0d1a12;
-    border: 1px solid #163322;
-    border-radius: 4px;
-    padding: 3px 10px;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.65rem;
-    color: #4a9e6a;
-    letter-spacing: 0.03em;
-}
+.upload-card:hover { border-color: var(--rose-warm); }
 
 /* ── Process button ── */
 .stButton > button {
-    background: linear-gradient(135deg, #0e3d22 0%, #145030 100%) !important;
-    color: #2ef87d !important;
-    border: 1px solid #1e6638 !important;
-    border-radius: 7px !important;
-    font-family: 'Space Mono', monospace !important;
-    font-size: 0.75rem !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.06em !important;
-    padding: 0.5rem 1.4rem !important;
-    text-transform: uppercase;
+    background: linear-gradient(135deg, var(--terracotta), var(--rose-deep)) !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    padding: 0.6rem 1.4rem !important;
+    letter-spacing: 0.02em !important;
+    box-shadow: 0 4px 15px rgba(184,100,85,0.3) !important;
     transition: all 0.2s ease !important;
-    box-shadow: 0 0 20px rgba(46,248,125,0.06) !important;
 }
 .stButton > button:hover {
-    background: linear-gradient(135deg, #144d2a 0%, #1a6038 100%) !important;
-    border-color: #2ef87d !important;
-    box-shadow: 0 0 25px rgba(46,248,125,0.18) !important;
+    box-shadow: 0 6px 22px rgba(184,100,85,0.45) !important;
     transform: translateY(-1px) !important;
 }
-.stButton > button:active {
-    transform: translateY(0px) !important;
+.stButton > button:active { transform: translateY(0) !important; }
+
+/* ── Status pill ── */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 13px;
+    border-radius: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.pill-ready   { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+.pill-idle    { background: var(--blush); color: var(--text-soft); border: 1px solid var(--rose-mid); }
+.pill-chunks  { background: var(--teal-light); color: var(--teal); border: 1px solid #a0d8e0; }
+
+/* ── File cards (processed files) ── */
+.file-cards { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 1rem; }
+.file-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 160px;
+    box-shadow: 0 2px 8px rgba(180,100,80,0.06);
+}
+.file-card-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--blush);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+.file-card-name {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-dark);
+    word-break: break-all;
+}
+.file-card-status {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
 }
 
-/* ── Info box ── */
-.info-box {
-    background: #08141e;
-    border: 1px solid #0f2a3a;
-    border-left: 3px solid #1a5580;
-    border-radius: 8px;
-    padding: 1rem 1.2rem;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.72rem;
-    color: #4a7a9b;
-    line-height: 1.7;
+/* ── Activity stream ── */
+.activity-panel {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.2rem 1.4rem;
+    height: 100%;
 }
-.info-box strong { color: #6aaece; }
+.activity-hdr {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-soft);
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+}
+.activity-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 0.55rem;
+}
+.act-time {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--text-soft);
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.act-msg {
+    font-size: 0.78rem;
+    color: var(--text-mid);
+    line-height: 1.4;
+}
+.act-ok   { color: #2e9e50; font-weight: 600; }
+.act-warn { color: var(--rose-warm); font-weight: 600; }
+.act-info { color: var(--teal); font-weight: 600; }
 
-/* ── Q&A chat cards ── */
-.qa-wrap {
-    margin-bottom: 1.2rem;
-    animation: fadeIn 0.4s ease;
+/* ── Stats panel ── */
+.stats-panel {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.2rem 1.4rem;
 }
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px); }
+.stats-hdr {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-soft);
+    margin-bottom: 1rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border);
+}
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.7rem;
+}
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-soft);
+}
+.stat-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-dark);
+    font-weight: 500;
+}
+.stat-bar-wrap {
+    width: 100%;
+    height: 5px;
+    background: var(--rose-light);
+    border-radius: 3px;
+    margin-top: 3px;
+    margin-bottom: 0.8rem;
+}
+.stat-bar {
+    height: 5px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--rose-warm), var(--terracotta));
+}
+
+/* ── Info notice ── */
+.notice-box {
+    background: var(--rose-light);
+    border: 1px solid var(--rose-mid);
+    border-left: 4px solid var(--rose-warm);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    font-size: 0.82rem;
+    color: var(--text-mid);
+    line-height: 1.6;
+}
+.notice-box strong { color: var(--text-dark); }
+
+/* ── Divider ── */
+.h-rule { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+
+/* ── Q&A cards ── */
+.qa-wrap { margin-bottom: 1rem; animation: fadeUp 0.35s ease; }
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 .qa-card {
-    background: #0c1118;
-    border: 1px solid #111d27;
-    border-radius: 10px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 14px;
     overflow: hidden;
+    box-shadow: 0 2px 12px rgba(180,100,80,0.06);
 }
-.qa-question {
-    background: #0a1610;
-    border-bottom: 1px solid #111d27;
-    padding: 0.9rem 1.2rem;
+.qa-question-bar {
+    background: var(--rose-light);
+    padding: 0.85rem 1.2rem;
     display: flex;
     gap: 10px;
     align-items: flex-start;
+    border-bottom: 1px solid var(--border);
 }
-.qa-q-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.6rem;
-    color: #2ef87d;
-    background: #0e2a18;
-    border: 1px solid #1e5030;
-    border-radius: 3px;
-    padding: 2px 6px;
+.qa-q-badge {
+    background: var(--rose-warm);
+    color: #fff;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 4px;
     flex-shrink: 0;
-    margin-top: 1px;
+    margin-top: 2px;
     letter-spacing: 0.06em;
 }
 .qa-q-text {
     font-size: 0.88rem;
-    color: #cdd8e3;
     font-weight: 500;
+    color: var(--text-dark);
     line-height: 1.5;
 }
-.qa-answer {
-    padding: 1rem 1.2rem;
-}
+.qa-answer-area { padding: 1rem 1.2rem; }
 .qa-a-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.6rem;
-    color: #4a6880;
-    letter-spacing: 0.1em;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--text-soft);
     text-transform: uppercase;
+    letter-spacing: 0.1em;
     margin-bottom: 0.5rem;
 }
 .qa-a-text {
     font-size: 0.87rem;
-    color: #b8c8d8;
+    color: var(--text-mid);
     line-height: 1.75;
     white-space: pre-wrap;
 }
 .qa-footer {
     padding: 0.6rem 1.2rem;
-    border-top: 1px solid #0d1822;
+    border-top: 1px solid var(--border);
+    background: #fdf8f6;
     display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
+    gap: 14px;
 }
-.qa-meta-tag {
-    font-family: 'Space Mono', monospace;
+.qa-meta {
+    font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
-    color: #2a4050;
-    letter-spacing: 0.06em;
+    color: var(--text-soft);
 }
-.qa-meta-tag span { color: #3d6070; }
+.qa-meta b { color: var(--text-mid); }
 
-/* ── Chunk box ── */
-.chunk-box {
-    background: #080d12;
-    border: 1px solid #0f1e2a;
-    border-left: 3px solid #1a5030;
-    border-radius: 6px;
-    padding: 0.8rem 1rem;
-    margin-bottom: 0.6rem;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.72rem;
-    color: #4a7060;
-    line-height: 1.65;
-    white-space: pre-wrap;
-}
-.chunk-label {
-    font-family: 'Space Mono', monospace;
+/* ── Chunk boxes ── */
+.chunk-hdr {
+    font-family: 'DM Mono', monospace;
     font-size: 0.6rem;
-    color: #2a6040;
+    color: var(--text-soft);
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.35rem;
+}
+.chunk-body {
+    background: var(--rose-light);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--rose-warm);
+    border-radius: 7px;
+    padding: 0.75rem 1rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-mid);
+    line-height: 1.65;
+    white-space: pre-wrap;
+    margin-bottom: 0.7rem;
 }
 
-/* ── Sidebar logo block ── */
-.sidebar-logo {
-    padding: 1.4rem 1.4rem 0.8rem 1.4rem;
-    border-bottom: 1px solid #0f2318;
-    margin-bottom: 0.6rem;
+/* ── Ask input ── */
+.stTextInput input {
+    background: var(--white) !important;
+    border: 1.5px solid var(--border) !important;
+    border-radius: 10px !important;
+    color: var(--text-dark) !important;
+    font-size: 0.9rem !important;
+    padding: 0.65rem 1rem !important;
 }
-.sidebar-logo-title {
-    font-family: 'Space Mono', monospace;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #2ef87d !important;
-    letter-spacing: -0.02em;
+.stTextInput input:focus {
+    border-color: var(--rose-warm) !important;
+    box-shadow: 0 0 0 3px rgba(201,123,110,0.12) !important;
 }
-.sidebar-logo-sub {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.58rem;
-    color: #1e4d30 !important;
+.stTextInput input::placeholder { color: var(--text-soft) !important; }
+
+/* ── Empty state ── */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--rose-mid);
+}
+.empty-icon { font-size: 2.5rem; margin-bottom: 0.6rem; }
+.empty-text {
+    font-size: 0.82rem;
+    color: var(--text-soft);
+    letter-spacing: 0.04em;
+}
+
+/* ── Sidebar logo ── */
+.sb-logo {
+    padding: 1.6rem 1.4rem 1rem 1.4rem;
+    border-bottom: 1px solid #5a2e2820;
+}
+.sb-logo-title {
+    font-family: 'Playfair Display', serif !important;
+    font-size: 1.15rem !important;
+    color: #e8c4bc !important;
+}
+.sb-logo-sub {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.58rem !important;
+    color: #7a4038 !important;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     margin-top: 2px;
 }
 
 /* ── Sidebar section header ── */
-.sb-section {
-    padding: 0.8rem 1.4rem 0.3rem 1.4rem;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.58rem;
-    color: #1e4d30 !important;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    border-top: 1px solid #0a1e13;
+.sb-hdr {
+    padding: 1rem 1.4rem 0.3rem 1.4rem;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.58rem !important;
+    color: #8a5a50 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.16em !important;
+    border-top: 1px solid #3a1a1420;
 }
 
-/* ── Ask input ── */
-.stTextInput input {
-    background: #0c1520 !important;
-    border: 1px solid #162435 !important;
-    color: #cdd8e3 !important;
-    border-radius: 8px !important;
-    font-family: 'DM Sans', sans-serif !important;
-    font-size: 0.9rem !important;
-    padding: 0.65rem 1rem !important;
-}
-.stTextInput input:focus {
-    border-color: #2ef87d !important;
-    box-shadow: 0 0 0 3px rgba(46,248,125,0.07) !important;
-}
-.stTextInput input::placeholder { color: #2a4050 !important; }
-
-/* ── Divider ── */
-.h-rule {
-    border: none;
-    border-top: 1px solid #0e1a22;
-    margin: 1.4rem 0;
-}
-
-/* ── History counter ── */
-.history-counter {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.62rem;
-    color: #2a4050;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    margin-bottom: 1rem;
-}
-
-/* ── Empty state ── */
-.empty-state {
-    text-align: center;
-    padding: 3rem 1rem;
-    color: #1e3040;
-}
-.empty-state-icon { font-size: 2rem; margin-bottom: 0.6rem; }
-.empty-state-text {
-    font-family: 'Space Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-}
-
-/* ── Status bar (after processing) ── */
-.status-bar {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 1.2rem;
-    padding: 0.8rem 1rem;
-    background: #080e12;
-    border: 1px solid #0f1e28;
-    border-radius: 8px;
-}
-
-/* Streamlit override cleanups */
-.stFileUploader { border-radius: 8px; }
-[data-testid="stFileUploader"] section {
-    background: #0a1018 !important;
-    border: 1px dashed #162435 !important;
-    border-radius: 8px !important;
-}
-[data-testid="stFileUploader"] section:hover {
-    border-color: #2ef87d55 !important;
-}
+/* Expander */
 [data-testid="stExpander"] {
-    background: #09111a !important;
-    border: 1px solid #0f1e28 !important;
-    border-radius: 8px !important;
+    background: var(--white) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
 }
 [data-testid="stExpander"] summary {
-    font-family: 'Space Mono', monospace !important;
+    font-family: 'DM Mono', monospace !important;
     font-size: 0.7rem !important;
-    color: #2a5040 !important;
-    letter-spacing: 0.06em;
+    color: var(--text-soft) !important;
 }
+
+/* Streamlit alerts */
 div[data-testid="stAlert"] {
-    background: #0a1610 !important;
-    border-color: #1a4028 !important;
-    color: #4a9a60 !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  SESSION STATE INIT
+#  SESSION STATE
 # ──────────────────────────────────────────────────────────────────────────────
 defaults = {
     "vectorstore": None,
@@ -477,10 +523,24 @@ defaults = {
     "processed_files": [],
     "total_chunks": 0,
     "embedding_model": None,
+    "activity_log": [],   # list of {"time": str, "msg": str, "kind": str}
 }
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+
+def log_activity(msg: str, kind: str = "info"):
+    """Append an entry to the activity stream."""
+    now = datetime.datetime.now().strftime("%H:%M:%S")
+    st.session_state.activity_log.insert(0, {"time": now, "msg": msg, "kind": kind})
+    st.session_state.activity_log = st.session_state.activity_log[:20]  # keep last 20
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  RESOLVE API KEY (auto from .env / secrets, fallback to sidebar input)
+# ──────────────────────────────────────────────────────────────────────────────
+auto_key = get_groq_api_key()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -488,104 +548,126 @@ for k, v in defaults.items():
 # ──────────────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div class="sidebar-logo">
-        <div class="sidebar-logo-title">⬡ RAG Studio</div>
-        <div class="sidebar-logo-sub">Document Intelligence System</div>
+    <div class="sb-logo">
+        <div class="sb-logo-title">✦ RAG Studio</div>
+        <div class="sb-logo-sub">Document Intelligence</div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="sb-section">⬡ API Configuration</div>', unsafe_allow_html=True)
-    groq_api_key = st.text_input(
-        "GROQ API KEY",
-        type="password",
-        placeholder="gsk_...",
-        help="Get your key at console.groq.com",
-    )
+    st.markdown('<div class="sb-hdr">⬡ API Configuration</div>', unsafe_allow_html=True)
+
+    if auto_key:
+        st.markdown(
+            '<div style="padding:0.4rem 1.4rem 0.2rem; font-size:0.72rem; color:#7ab87a;">'
+            '✓ API key loaded from environment</div>',
+            unsafe_allow_html=True,
+        )
+        groq_api_key = auto_key
+        # Still show a masked display
+        st.text_input("GROQ API KEY", value="••••••••••••••••••••", disabled=True,
+                      label_visibility="collapsed")
+    else:
+        groq_api_key = st.text_input(
+            "GROQ API KEY",
+            type="password",
+            placeholder="gsk_... (or add to .env / secrets.toml)",
+            help="Priority: .env / secrets.toml → OS env → this field",
+            label_visibility="collapsed",
+        )
+
     groq_model = st.selectbox("MODEL", SUPPORTED_MODELS, index=0)
     temperature = st.slider("TEMPERATURE", 0.0, 1.0, 0.0, 0.05)
 
-    st.markdown('<div class="sb-section">⬡ Chunking Strategy</div>', unsafe_allow_html=True)
-    chunk_strategy = st.selectbox(
-        "STRATEGY",
-        CHUNK_STRATEGIES,
-        index=0,
-        help="Recursive: paragraphs→sentences→words\nCharacter: fixed character count\nSemantic: embedding-similarity based",
-    )
+    st.markdown('<div class="sb-hdr">⬡ Chunking Strategy</div>', unsafe_allow_html=True)
+    chunk_strategy = st.selectbox("STRATEGY", CHUNK_STRATEGIES, index=0,
+        help="Recursive: paragraphs→sentences→words\nCharacter: fixed chars\nSemantic: embedding similarity")
     if chunk_strategy != "Sentence (Semantic)":
         chunk_size    = st.slider("CHUNK SIZE", 100, 2000, 500, 50)
         chunk_overlap = st.slider("CHUNK OVERLAP", 0, 500, 50, 10)
     else:
-        st.markdown(
-            '<div class="info-box">Semantic chunking uses embedding similarity — no fixed size required.</div>',
-            unsafe_allow_html=True,
-        )
+        st.info("Semantic chunking uses embedding similarity — no fixed size needed.")
         chunk_size, chunk_overlap = 500, 50
 
-    st.markdown('<div class="sb-section">⬡ Embedding Model</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sb-hdr">⬡ Embedding Model</div>', unsafe_allow_html=True)
     embed_model_name = st.selectbox("HUGGINGFACE MODEL", SUPPORTED_EMBED_MODELS, index=0)
 
-    st.markdown('<div class="sb-section">⬡ Retrieval</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sb-hdr">⬡ Retrieval</div>', unsafe_allow_html=True)
     top_k = st.slider("TOP-K DOCUMENTS", 1, 20, 10, 1)
 
     st.markdown("---")
-    if st.button("⬡ Clear Chat History", use_container_width=True):
+    if st.button("✦ Clear Chat History", use_container_width=True):
         st.session_state.chat_history = []
+        log_activity("Chat history cleared", "warn")
         st.rerun()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  MAIN — MASTHEAD
+#  MASTHEAD
 # ──────────────────────────────────────────────────────────────────────────────
 st.markdown("""
-<div class="masthead">
-    <span class="masthead-rag">RAG</span>
-    <span class="masthead-studio">Studio</span>
-    <span class="masthead-version">v2.0</span>
+<div class="masthead-wrap">
+    <div class="masthead-left">
+        <div class="masthead-icon">✦</div>
+        <div class="masthead-title"><span class="accent">RAG</span> Studio</div>
+        <div class="masthead-sub">Upload documents · Configure chunking · Ask anything</div>
+    </div>
 </div>
-<div class="masthead-sub">// Retrieval-Augmented Generation · Document Intelligence</div>
 """, unsafe_allow_html=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  DOCUMENT UPLOAD PANEL
+#  UPLOAD SECTION
 # ──────────────────────────────────────────────────────────────────────────────
-st.markdown('<div class="section-label">01 — Document Ingestion</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-hdr">01 · Document Upload</div>', unsafe_allow_html=True)
 
-with st.container():
-    col_up, col_proc = st.columns([3, 1], gap="medium")
+col_up, col_proc = st.columns([3, 1], gap="medium")
 
-    with col_up:
-        uploaded_files = st.file_uploader(
-            "Upload Documents",
-            type=["pdf", "docx", "txt", "csv", "xlsx", "html", "md"],
-            accept_multiple_files=True,
-            label_visibility="collapsed",
-            help="PDF · DOCX · TXT · CSV · XLSX · HTML · Markdown",
+with col_up:
+    uploaded_files = st.file_uploader(
+        "Upload",
+        type=["pdf", "docx", "txt", "csv", "xlsx", "html", "md"],
+        accept_multiple_files=True,
+        label_visibility="collapsed",
+        help="PDF · DOCX · TXT · CSV · XLSX · HTML · Markdown",
+    )
+
+with col_proc:
+    st.write("")
+    process_btn = st.button("⚡ Process Files", use_container_width=True)
+    st.write("")
+    if st.session_state.vectorstore:
+        st.markdown(
+            f'<span class="status-pill pill-ready">● Ready</span>&nbsp;'
+            f'<span class="status-pill pill-chunks">{st.session_state.total_chunks} chunks</span>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<span class="status-pill pill-idle">○ Not Processed</span>',
+            unsafe_allow_html=True,
         )
 
-    with col_proc:
-        st.write("")  # vertical align
-        process_btn = st.button("⚡ Process Files", use_container_width=True)
-        if st.session_state.vectorstore:
-            st.markdown(
-                f'<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">'
-                f'<span class="badge badge-ready badge-dot-green">Ready</span>'
-                f'<span class="badge badge-info">{st.session_state.total_chunks} chunks</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                '<div style="margin-top:8px;">'
-                '<span class="badge badge-idle badge-dot-gray">Not Processed</span>'
-                '</div>',
-                unsafe_allow_html=True,
-            )
-
-# Show file pills
+# ── File cards ────────────────────────────────────────────────────────────────
 if uploaded_files:
-    pills = "".join([f'<span class="file-pill">📄 {f.name}</span>' for f in uploaded_files])
-    st.markdown(f'<div class="file-pills">{pills}</div>', unsafe_allow_html=True)
+    ext_icons = {"pdf": "📄", "docx": "📝", "txt": "🗒️", "csv": "📊",
+                 "xlsx": "📊", "html": "🌐", "md": "📋"}
+    cards_html = '<div class="file-cards">'
+    for f in uploaded_files:
+        ext = f.name.rsplit(".", 1)[-1].lower()
+        icon = ext_icons.get(ext, "📁")
+        processed = f.name in st.session_state.processed_files
+        status = "Processed" if processed else "Pending"
+        status_color = "#2e7d32" if processed else "#b08880"
+        cards_html += f"""
+        <div class="file-card">
+            <div class="file-card-icon">{icon}</div>
+            <div>
+                <div class="file-card-name">{f.name}</div>
+                <div class="file-card-status" style="color:{status_color};">{status}</div>
+            </div>
+        </div>"""
+    cards_html += '</div>'
+    st.markdown(cards_html, unsafe_allow_html=True)
 
 st.markdown('<hr class="h-rule">', unsafe_allow_html=True)
 
@@ -597,15 +679,18 @@ if process_btn:
     if not uploaded_files:
         st.warning("Please upload at least one file first.")
     elif not groq_api_key:
-        st.warning("Please enter your Groq API key in the sidebar.")
+        st.warning("Please enter your Groq API key in the sidebar (or add it to .env / secrets.toml).")
     else:
+        log_activity("Processing started", "info")
         with st.spinner("Loading documents & building FAISS index…"):
             all_docs, failed = [], []
             for uf in uploaded_files:
                 try:
                     all_docs.extend(load_file(uf))
-                except Exception:
+                    log_activity(f"Loaded: {uf.name}", "ok")
+                except Exception as e:
                     failed.append(uf.name)
+                    log_activity(f"Failed: {uf.name}", "warn")
 
             if all_docs:
                 try:
@@ -616,64 +701,109 @@ if process_btn:
                     st.session_state.total_chunks    = n_chunks
                     st.session_state.processed_files = [f.name for f in uploaded_files]
                     st.session_state.embedding_model  = emb
-                    st.success(
-                        f"✓ {len(uploaded_files)} file(s) processed → "
-                        f"{n_chunks} chunks → FAISS index ready"
-                    )
+                    log_activity(f"FAISS index built — {n_chunks} chunks", "ok")
+                    log_activity(f"Model: {groq_model}", "info")
+                    st.success(f"✓ {len(uploaded_files)} file(s) → {n_chunks} chunks → FAISS index ready!")
                 except Exception as e:
+                    log_activity(f"Vectorstore error: {e}", "warn")
                     st.error(f"Error building vectorstore: {e}")
             else:
                 st.error("Could not load any documents. Check file formats.")
-
             if failed:
-                st.warning(f"Failed to load: {', '.join(failed)}")
-
+                st.warning(f"Failed: {', '.join(failed)}")
         st.rerun()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  CHAT / Q&A SECTION
+#  ACTIVITY STREAM + STATS  (always shown)
 # ──────────────────────────────────────────────────────────────────────────────
-if not st.session_state.vectorstore:
-    st.markdown("""
-    <div class="info-box">
-        <strong>Getting started —</strong>
-        Upload your documents above, add your Groq API key in the sidebar,
-        then click <strong>⚡ Process Files</strong> to build the knowledge base.
-        Once ready, type any question to query your documents.
+col_act, col_stats = st.columns([3, 1], gap="medium")
+
+with col_act:
+    kind_cls = {"ok": "act-ok", "warn": "act-warn", "info": "act-info"}
+    kind_prefix = {"ok": "OK", "warn": "WARN", "info": "INFO"}
+
+    lines_html = ""
+    if st.session_state.activity_log:
+        for entry in st.session_state.activity_log[:8]:
+            cls = kind_cls.get(entry["kind"], "act-info")
+            prefix = kind_prefix.get(entry["kind"], "INFO")
+            lines_html += f"""
+            <div class="activity-line">
+                <span class="act-time">[{entry['time']}]</span>
+                <span class="act-msg"><span class="{cls}">{prefix}:</span> {entry['msg']}</span>
+            </div>"""
+    else:
+        lines_html = '<div class="act-msg" style="color:#c8a89a; font-size:0.78rem;">No activity yet — upload and process files to begin.</div>'
+
+    st.markdown(f"""
+    <div class="activity-panel">
+        <div class="activity-hdr">⬡ Activity Stream</div>
+        {lines_html}
     </div>
     """, unsafe_allow_html=True)
 
-else:
-    # ── Status bar ────────────────────────────────────────────────────────────
-    files_str = " · ".join(st.session_state.processed_files)
-    st.markdown(
-        f"""
-        <div class="status-bar">
-            <span class="badge badge-ready badge-dot-green">Vectorstore Ready</span>
-            <span class="badge badge-info">FAISS · {st.session_state.total_chunks} chunks</span>
-            <span class="badge badge-warn">{chunk_strategy}</span>
-            <span class="qa-meta-tag" style="margin-left:4px;">— <span>{files_str}</span></span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+with col_stats:
+    chunks     = st.session_state.total_chunks
+    files_done = len(st.session_state.processed_files)
+    qa_count   = len(st.session_state.chat_history)
+    chunk_pct  = min(int((chunks / 2000) * 100), 100)  # visual only
 
-    # ── Question input ────────────────────────────────────────────────────────
-    st.markdown('<div class="section-label">02 — Query Interface</div>', unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="stats-panel">
+        <div class="stats-hdr">⬡ Index Stats</div>
+        <div class="stat-row">
+            <span class="stat-label">Files</span>
+            <span class="stat-val">{files_done}</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Chunks</span>
+            <span class="stat-val">{chunks}</span>
+        </div>
+        <div class="stat-bar-wrap">
+            <div class="stat-bar" style="width:{chunk_pct}%"></div>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Strategy</span>
+            <span class="stat-val">{chunk_strategy.split()[0]}</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Q&A Pairs</span>
+            <span class="stat-val">{qa_count}</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown('<hr class="h-rule">', unsafe_allow_html=True)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  CHAT / Q&A
+# ──────────────────────────────────────────────────────────────────────────────
+if not st.session_state.vectorstore:
+    st.markdown("""
+    <div class="notice-box">
+        <strong>Getting started —</strong>
+        Upload your documents above, add your Groq API key in the sidebar
+        (or set <code>GROQ_API_KEY</code> in your <code>.env</code> or
+        <code>.streamlit/secrets.toml</code>), then click
+        <strong>⚡ Process Files</strong> to build the knowledge base.
+    </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown('<div class="section-hdr">02 · Query Interface</div>', unsafe_allow_html=True)
 
     col_q, col_btn = st.columns([5, 1], gap="small")
     with col_q:
         user_question = st.text_input(
             "Question",
-            placeholder="What does the document say about…?",
+            placeholder="Ask anything about your documents…",
             label_visibility="collapsed",
             key="question_input",
         )
     with col_btn:
-        ask_btn = st.button("ASK →", use_container_width=True)
+        ask_btn = st.button("Ask →", use_container_width=True)
 
-    # ── Handle question ───────────────────────────────────────────────────────
     if ask_btn and user_question.strip():
         if not groq_api_key:
             st.warning("Add your Groq API key in the sidebar.")
@@ -682,10 +812,7 @@ else:
                 try:
                     llm = get_llm(groq_api_key, groq_model, temperature)
                     answer, top2_chunks = rag_answer(
-                        user_question,
-                        st.session_state.vectorstore,
-                        llm,
-                        k=top_k,
+                        user_question, st.session_state.vectorstore, llm, k=top_k
                     )
                     st.session_state.chat_history.insert(0, {
                         "question": user_question,
@@ -693,58 +820,50 @@ else:
                         "chunks":   top2_chunks,
                         "model":    groq_model,
                     })
+                    log_activity(f"Query answered: {user_question[:40]}…", "ok")
                 except Exception as e:
+                    log_activity(f"Query error: {e}", "warn")
                     st.error(f"Error: {e}")
             st.rerun()
 
     st.markdown('<hr class="h-rule">', unsafe_allow_html=True)
-
-    # ── Chat history ──────────────────────────────────────────────────────────
-    st.markdown('<div class="section-label">03 — Conversation History</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-hdr">03 · Conversation History</div>', unsafe_allow_html=True)
 
     if st.session_state.chat_history:
         total = len(st.session_state.chat_history)
-        st.markdown(
-            f'<div class="history-counter">{total} exchange{"s" if total > 1 else ""} · most recent first</div>',
-            unsafe_allow_html=True,
-        )
-
         for i, item in enumerate(st.session_state.chat_history):
             q_num = total - i
             st.markdown(f"""
             <div class="qa-wrap">
                 <div class="qa-card">
-                    <div class="qa-question">
-                        <span class="qa-q-label">Q{q_num}</span>
+                    <div class="qa-question-bar">
+                        <span class="qa-q-badge">Q{q_num}</span>
                         <span class="qa-q-text">{item['question']}</span>
                     </div>
-                    <div class="qa-answer">
-                        <div class="qa-a-label">// Answer</div>
+                    <div class="qa-answer-area">
+                        <div class="qa-a-label">// Response</div>
                         <div class="qa-a-text">{item['answer']}</div>
                     </div>
                     <div class="qa-footer">
-                        <span class="qa-meta-tag">model: <span>{item['model']}</span></span>
-                        <span class="qa-meta-tag">·</span>
-                        <span class="qa-meta-tag">chunks retrieved: <span>{len(item['chunks'])}</span></span>
+                        <span class="qa-meta">model: <b>{item['model']}</b></span>
+                        <span class="qa-meta">chunks retrieved: <b>{len(item['chunks'])}</b></span>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander(f"📎 Top 2 source chunks — Q{q_num}"):
+            with st.expander(f"📎 Source chunks — Q{q_num}"):
                 for j, chunk in enumerate(item["chunks"]):
                     st.markdown(
-                        f'<div class="chunk-label">Chunk {j+1} · {chunk["filename"]}</div>',
+                        f'<div class="chunk-hdr">Chunk {j+1} · {chunk["filename"]}</div>',
                         unsafe_allow_html=True,
                     )
-                    preview = chunk["content"][:600]
-                    if len(chunk["content"]) > 600:
-                        preview += "…"
-                    st.markdown(f'<div class="chunk-box">{preview}</div>', unsafe_allow_html=True)
+                    preview = chunk["content"][:600] + ("…" if len(chunk["content"]) > 600 else "")
+                    st.markdown(f'<div class="chunk-body">{preview}</div>', unsafe_allow_html=True)
     else:
         st.markdown("""
         <div class="empty-state">
-            <div class="empty-state-icon">⬡</div>
-            <div class="empty-state-text">Ask your first question above</div>
+            <div class="empty-icon">✦</div>
+            <div class="empty-text">Ask your first question above</div>
         </div>
         """, unsafe_allow_html=True)
