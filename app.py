@@ -382,79 +382,106 @@ with st.sidebar:
         st.rerun()
 
 # ──────────────────────────────────────────────────────────────────────────────
-#  HERO — with decorative network SVG (top-right, matches screenshot)
+#  HERO — CSS-only (Streamlit Cloud strips <svg> inside st.markdown)
 # ──────────────────────────────────────────────────────────────────────────────
 st.markdown("""
+<style>
+.hero {
+    position: relative;
+    padding: 1.6rem 2rem 1.4rem 2rem;
+    margin-bottom: 1.4rem;
+    overflow: hidden;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #faf3ef 0%, #f5ede6 60%, #f0e4db 100%);
+    border: 1px solid #e8d4cc;
+}
+.hero::before {
+    content: '';
+    position: absolute;
+    right: -40px; top: -60px;
+    width: 280px; height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #e8c4bc44 0%, #c8756a11 60%, transparent 80%);
+    pointer-events: none;
+}
+.hero::after {
+    content: '';
+    position: absolute;
+    right: 60px; top: 20px;
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #c8756a22 0%, transparent 70%);
+    border: 1px solid #e8c4bc55;
+    pointer-events: none;
+}
+.hero-node {
+    position: absolute;
+    background: #ffffff;
+    border: 1px solid #e0ccc6;
+    border-radius: 8px;
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem;
+    box-shadow: 0 2px 8px rgba(200,117,106,0.1);
+}
+.hn1 { right: 230px; top: 18px; }
+.hn2 { right: 148px; top: 10px; }
+.hn3 { right: 82px;  top: 38px; }
+.hn4 { right: 180px; top: 72px; }
+.hn5 { right: 100px; top: 82px; }
+.hero-center-dot {
+    position: absolute;
+    right: 138px; top: 38px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #c8756a 30%, #e8b4a8 100%);
+    box-shadow: 0 0 22px rgba(200,117,106,0.45);
+}
+.hero-teal-dot {
+    position: absolute;
+    right: 268px; top: 58px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #5aabb8;
+    border: 2px solid #e0f3f7;
+    box-shadow: 0 0 10px rgba(90,171,184,0.3);
+}
+.hero-content { position: relative; z-index: 2; }
+.hero-logo-row { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+.hero-icon-box {
+    width:48px; height:48px;
+    background: linear-gradient(135deg, #c8756a, #a05548);
+    border-radius:12px; display:flex; align-items:center;
+    justify-content:center; font-size:1.3rem;
+    box-shadow:0 4px 16px rgba(200,117,106,0.35);
+}
+.hero-title {
+    font-family:'Cormorant Garamond',serif;
+    font-size:3rem; font-weight:700; line-height:1;
+    color:#2e1a14; letter-spacing:-0.01em;
+}
+.hero-title .rag { color:#c8756a; }
+.hero-subtitle { font-size:0.82rem; color:#b08880; letter-spacing:0.04em; margin-top:6px; }
+</style>
+
 <div class="hero">
-  <div class="hero-left">
-    <div class="hero-logo-row">
-      <div class="hero-icon-box">✦</div>
-      <div class="hero-title"><span class="rag">RAG</span> Studio</div>
+    <div class="hero-node hn1">📄</div>
+    <div class="hero-node hn2">📋</div>
+    <div class="hero-node hn3">📝</div>
+    <div class="hero-node hn4">📄</div>
+    <div class="hero-node hn5">🗒</div>
+    <div class="hero-center-dot"></div>
+    <div class="hero-teal-dot"></div>
+    <div class="hero-content">
+        <div class="hero-logo-row">
+            <div class="hero-icon-box">✦</div>
+            <div class="hero-title"><span class="rag">RAG</span> Studio</div>
+        </div>
+        <div class="hero-subtitle">Upload documents. Configure chunking. Ask anything.</div>
     </div>
-    <div class="hero-subtitle">Upload documents. Configure chunking. Ask anything.</div>
-  </div>
-
-  <svg class="hero-graphic" viewBox="0 0 360 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <!-- Background wavy lines -->
-    <path d="M10 100 Q70 45 140 75 Q200 105 265 55 Q310 15 355 42" stroke="#e8c4bc" stroke-width="1.8" fill="none" opacity="0.55"/>
-    <path d="M10 120 Q80 68 155 95 Q215 118 270 75 Q315 48 355 65" stroke="#c8756a" stroke-width="1.1" fill="none" opacity="0.35"/>
-    <path d="M10 140 Q90 100 162 118 Q222 135 278 97 Q320 70 355 88" stroke="#e8c4bc" stroke-width="0.9" fill="none" opacity="0.25"/>
-    <path d="M10 80  Q65 35 130 60 Q195 88 255 42 Q305 8 355 30"  stroke="#d4a09a" stroke-width="0.7" fill="none" opacity="0.3"/>
-
-    <!-- Connection lines from center node -->
-    <line x1="255" y1="58" x2="208" y2="82"  stroke="#d4a09a" stroke-width="0.9" opacity="0.6"/>
-    <line x1="255" y1="58" x2="285" y2="95"  stroke="#d4a09a" stroke-width="0.9" opacity="0.6"/>
-    <line x1="255" y1="58" x2="230" y2="20"  stroke="#d4a09a" stroke-width="0.9" opacity="0.6"/>
-    <line x1="255" y1="58" x2="305" y2="35"  stroke="#d4a09a" stroke-width="0.9" opacity="0.6"/>
-    <line x1="255" y1="58" x2="270" y2="118" stroke="#d4a09a" stroke-width="0.7" opacity="0.35"/>
-
-    <!-- Center glowing node -->
-    <circle cx="255" cy="58" r="22" fill="#e8c4bc" opacity="0.25"/>
-    <circle cx="255" cy="58" r="16" fill="#f0dbd6" opacity="0.6"/>
-    <circle cx="255" cy="58" r="10" fill="url(#cg1)"/>
-    <circle cx="255" cy="58" r="5"  fill="#c8756a" opacity="0.85"/>
-
-    <!-- Doc node 1 (left-bottom) -->
-    <rect x="193" y="70" width="28" height="28" rx="6" fill="#faf3ef" stroke="#e0ccc6" stroke-width="1.2"/>
-    <line x1="200" y1="79" x2="214" y2="79" stroke="#c8a89a" stroke-width="1.2"/>
-    <line x1="200" y1="83" x2="214" y2="83" stroke="#c8a89a" stroke-width="1.2"/>
-    <line x1="200" y1="87" x2="208" y2="87" stroke="#c8a89a" stroke-width="1.2"/>
-
-    <!-- Doc node 2 (right-bottom) -->
-    <rect x="274" y="84" width="28" height="28" rx="6" fill="#faf3ef" stroke="#e0ccc6" stroke-width="1.2"/>
-    <line x1="281" y1="93" x2="295" y2="93" stroke="#c8a89a" stroke-width="1.2"/>
-    <line x1="281" y1="97" x2="295" y2="97" stroke="#c8a89a" stroke-width="1.2"/>
-    <line x1="281" y1="101" x2="289" y2="101" stroke="#c8a89a" stroke-width="1.2"/>
-
-    <!-- Doc node 3 (top-left) -->
-    <rect x="218" y="8" width="28" height="28" rx="6" fill="#faf3ef" stroke="#e0ccc6" stroke-width="1.2"/>
-    <line x1="225" y1="17" x2="239" y2="17" stroke="#c8a89a" stroke-width="1.2"/>
-    <line x1="225" y1="21" x2="239" y2="21" stroke="#c8a89a" stroke-width="1.2"/>
-    <line x1="225" y1="25" x2="233" y2="25" stroke="#c8a89a" stroke-width="1.2"/>
-
-    <!-- Doc node 4 (top-right) -->
-    <rect x="298" y="22" width="28" height="28" rx="6" fill="#faf3ef" stroke="#e0ccc6" stroke-width="1.2"/>
-    <line x1="305" y1="31" x2="319" y2="31" stroke="#c8a89a" stroke-width="1.2"/>
-    <line x1="305" y1="35" x2="319" y2="35" stroke="#c8a89a" stroke-width="1.2"/>
-    <line x1="305" y1="39" x2="313" y2="39" stroke="#c8a89a" stroke-width="1.2"/>
-
-    <!-- Small accent node (below center) -->
-    <circle cx="262" cy="118" r="9"  fill="#f5ede6" stroke="#e0ccc6" stroke-width="1.2"/>
-    <circle cx="262" cy="118" r="3.5" fill="#c8756a" opacity="0.55"/>
-
-    <!-- Teal accent node (upper-left of center) -->
-    <circle cx="205" cy="45" r="11" fill="#e0f3f7" stroke="#a0d8e4" stroke-width="1.2"/>
-    <circle cx="205" cy="45" r="4.5" fill="#5aabb8" opacity="0.75"/>
-
-    <defs>
-      <radialGradient id="cg1" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#f0dbd6"/>
-        <stop offset="100%" stop-color="#c8756a" stop-opacity="0.7"/>
-      </radialGradient>
-    </defs>
-  </svg>
 </div>
 """, unsafe_allow_html=True)
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  UPLOAD SECTION
